@@ -1,0 +1,116 @@
+---
+title: "Group Project1_Monte Carlo Simulation Design."
+author: "hw2849"
+date: "P8160 Advanced Statistical Computing "
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+require(survival)
+require(quantreg)
+require(glmnet)
+require(MASS)
+require(pROC)
+
+library(survival)
+library(dplyr)
+library(tidyverse)
+
+set.seed(8160)
+```
+
+
+\begin{description}
+
+\item[Project 2] Design a simulation study to assess the three hypothesis testings]
+
+\end{description}
+
+
+## Project 2: Design a simulation study to assess the three hypothsis testings 
+
+
+**Background:** Continue from the background introduction in Project 1. 
+In many randomized clinical trials, the primary outcome is a time-to-event. The treatment effect is summarized by the hazard ratio (HR) between the control and treatment arms, under the proportional hazards assumption.  The logrank test is widely used to determine the treatment effect since it is the optimal (most powerful) rank test under the proportional hazards assumption. 
+
+Let $t_1<t_2<\cdots<t_J$ are $J$ distinct failure times; The log-rank test statistics calculate the difference between "observed" and "expected" number of faitures (under $H_0$) at each observed failure time, and aggregate them overtime.
+
+$$S_{Logrank} =\frac{\sum_{j=1}^J (O_{j}-E_{j})}{\sqrt{\sum_{j=1}^J V_{j}}}\sim N(0, 1) \, \mbox{ under } H_0,$$
+where $O_j$ and $E_j$ are "observed" and "expected" numbers of failures at the $j$th failure time, and $V_{j}$ is the variance of the observed number of failures.
+
+
+During the last decade, more and more researchers reported that non-proportional hazards (non-PH) occur fairly often in clinical trials. For example, a therapy could shown effective at an early stage, but then ‘wearing off’ over time; or a therapy could show a "delayed" effect which only manifest after a period of time. 
+
+To adjust for potential non-proportional hazard functions, Fleming and Harrington considered "weighted log rank tests" 
+
+$$S_{Logrank}^w =\frac{\sum_{j=1}^J W_j(O_{j}-E_{j})}{\sqrt{\sum_{j=1}^J W_jV_{j}}},$$
+where the weight function  $w(t)=\widehat{S}(t)^\rho (1-\widehat{S}(t))^\gamma$ include two parameters $\rho$ and $\gamma$; Choosing $(\rho=0, \gamma=1)$ puts more weight on late events, $(\rho=1, \gamma=0)$ puts more weight on early events. Researchers also considered combining different weighting schemes with appropriate multiple comparison controls. The following R functions 
+
+
+### R codes for log-rank and weighted log-rank tests
+```{r, eval=F, echo=T}
+
+library(nph)
+# log-rank 
+logrank.test(dat$y, dat$event, dat$group, rho = 0, gamma = 0) # dat$y: time, dat$event: T/F, dat$group: expected
+
+# weighted log-rank for a late effect
+logrank.test(dat$y, dat$event, dat$group, rho = 0, gamma =  1)
+
+# weighted log-rank for an early effect
+logrank.test(dat$y, dat$event, dat$group, rho   =  1,  gamma =  0 )
+
+# take maximum  over the previous three log-rank with multiple comparison control
+logrank.maxtest(dat$y, dat$event, dat$group)
+
+```
+
+
+**Your tasks:**  Design a set of distributions/models under both proportional-hazard and non-proportional-hazard assumptions, and carry out a simulation study to compare performance of those hypothesis tests in those models. Based on your numerical investigations, write a practical recommendation for general users to choose a suitable testing tool.  
+
+
+**Reference**
+Harrington, D. P. and Fleming, T. R. (1982). A class of rank test procedures for censored survival data. Biometrika 69, 553-566.
+
+
+```{r, non-proportional}
+
+n <- 1000 # a sample size of 1000
+p <- 500
+
+time = c(rexp(p),rweibull(p, 0.3, 0.1))  # a generated exponential distribution & weibull distribution
+
+trt = rep(1, 500)
+ctl = rep(0, 500)
+
+plot(density(time))
+plot(density(control))
+
+event = rep(1, 500)
+
+# log-rank 
+logrank.test(time$trt, event, control, rho = 0, gamma = 0)
+
+# weighted log-rank for a late effect
+logrank.test(treatment, event, control, rho = 0, gamma =  1)
+
+# weighted log-rank for an early effect
+logrank.test(treatment, event, control, rho = 1,  gamma =  0 )
+
+```
+
+type I: false positive 
+type II: false negative*
+
+proportional-test: observed and expected 一致
+unproportional-test: observed and expected 不一致
+
+repeat tests under the same setting 
+
+serenio 1: prop - same distribution(log normal), treatment and control group
+senerio 2: unprop - one from exp, the other one from weibull distribution
+
