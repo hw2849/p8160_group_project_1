@@ -92,18 +92,18 @@ plot(density(time))
 
 
 ```{r, coxed simulation}
-sim_data = sim.survdata(N = 500, T = 100, xvars = 2, censor = .2,  num.data.frames = 1)
+sim_data = sim.survdata(N = 500, T = 80, xvars = 2, censor = .2,  num.data.frames = 1)
 attributes(sim_data)
 
-head(sim_data$data$X1)
-head(sim_data$data$X2)
+head(sim_data$xdata)
+head(sim_data$data$y)
 head(sim_data$data$failed)
 
-logrank.test(sim_data$data$X1, sim_data$data$failed, sim_data$data$X2, rho = 0, gamma = 0)
+logrank.test(sim_data$data$X1, sim_data$data$failed, sim_data$data$y, rho = 0, gamma = 0)
 
-logrank.test(sim_data$data$X1, sim_data$data$failed, sim_data$data$X2, rho = 1, gamma = 0)
+logrank.test(sim_data$data$X1, sim_data$data$failed, sim_data$data$y, rho = 1, gamma = 0)
 
-logrank.test(sim_data$data$X1, sim_data$data$failed, sim_data$data$X2, rho = 0, gamma = 1)
+logrank.test(sim_data$data$X1, sim_data$data$failed, sim_data$data$y, rho = 0, gamma = 1)
 ```
 
 type I: false positive 
