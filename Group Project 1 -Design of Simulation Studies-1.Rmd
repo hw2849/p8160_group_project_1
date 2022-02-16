@@ -19,6 +19,7 @@ require(pROC)
 library(survival)
 library(coxed)
 library(nph)
+library(tidyverse)
 
 set.seed(8160)
 ```
@@ -68,13 +69,26 @@ test_data = data.frame(
   time = c(rexp(p), rweibull(p, 0.3, 0.1)),
   treatment = rep(1, 500),
   control = rep(0, 500),
-  event = time >= 5,
   group = c(treatment, control)
-)
+) %>% 
+#  filter(time >= 4) %>% 
+  mutate(
+    event = case_when(time >= 4 ~ 0, 
+                      time < 4 ~ 1)
+  )
 
 logrank.test(test_data$time, test_data$event, test_data$group, rho = 0, gamma = 0)
+logrank.test(test_data$time, test_data$event, test_data$group, rho = 1, gamma = 0)
+logrank.test(test_data$time, test_data$event, test_data$group, rho = 0, gamma = 1)
 
 #plot(density(time))
+
+library(survival)
+library(survminer)
+library(lubridate)
+
+
+lung_data = lung  
 
 ```
 
@@ -82,20 +96,33 @@ logrank.test(test_data$time, test_data$event, test_data$group, rho = 0, gamma = 
 
 ```{r, proportional}
 set.seed(8160)
-sim_data = sim.survdata(N = 1000, T = 100, xvars = 1, censor = .2, num.data.frames = 1) # simulating data
+sim_data = sim.survdata(N = 500, T = 100, xvars = 1, censor = .4, num.data.frames = 2) # simulating data
 
-head(sim_data$data$X)
-head(sim_data$data$y) 
-head(sim_data$data$failed)
+test_df = data.frame( #trt = 1, ctl = 0
+  time_1 = sim_data[[1]]$data$y,
+  time_0 = sim_data[[2]]$data$y,
+  fail_1 = sim_data[[1]]$data$failed,
+  fail_0 = sim_data[[2]]$data$failed
+) %>% 
+  pivot_longer(
+    time_1:fail_0,
+    names_to = c(".value", "group"),
+    names_sep = "_"
+  ) %>% 
+  mutate(group = as.numeric(group))
 
-plot(sim_data$data$X, sim_data$data$y)
+
+logrank.test(test_df$time, test_df$fail, test_df$group, rho = 0, gamma = 0)
+
+logrank.test(test_df$time, test_df$fail, test_df$group, rho = 1, gamma = 0)
+logrank.test(test_df$time, test_df$fail, test_df$group, rho = 0, gamma = 1)
 
 ```
 
 
 ```{r, prop log-rank tests}
 # log-rank
-logrank.test(sim_data$data$X, sim_data$data$failed, sim_data$data$y, rho = 0, gamma = 0)
+logrank.test(sim_data$data$y, sim_data$data$failed, sim_data$data$y, rho = 0, gamma = 0)
 
 # weighted late effect
 logrank.test(sim_data$data$X, sim_data$data$failed, sim_data$data$y, rho = 0, gamma = 1)
