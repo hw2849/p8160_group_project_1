@@ -17,8 +17,8 @@ require(MASS)
 require(pROC)
 
 library(survival)
-library(dplyr)
-library(tidyverse)
+library(coxed)
+library(nph)
 
 set.seed(8160)
 ```
@@ -51,69 +51,64 @@ $$S_{Logrank}^w =\frac{\sum_{j=1}^J W_j(O_{j}-E_{j})}{\sqrt{\sum_{j=1}^J W_jV_{j
 where the weight function  $w(t)=\widehat{S}(t)^\rho (1-\widehat{S}(t))^\gamma$ include two parameters $\rho$ and $\gamma$; Choosing $(\rho=0, \gamma=1)$ puts more weight on late events, $(\rho=1, \gamma=0)$ puts more weight on early events. Researchers also considered combining different weighting schemes with appropriate multiple comparison controls. The following R functions 
 
 
-### R codes for log-rank and weighted log-rank tests
-```{r, eval=F, echo=T}
-
-library(nph)
-library(coxed)
-# log-rank 
-logrank.test(dat$y, dat$event, dat$group, rho = 0, gamma = 0) # dat$y: time, dat$event: T/F, dat$group: expected
-
-# weighted log-rank for a late effect
-logrank.test(dat$y, dat$event, dat$group, rho = 0, gamma =  1)
-
-# weighted log-rank for an early effect
-logrank.test(dat$y, dat$event, dat$group, rho   =  1,  gamma =  0 )
-
-# take maximum  over the previous three log-rank with multiple comparison control
-logrank.maxtest(dat$y, dat$event, dat$group)
-
-```
-
-
 **Your tasks:**  Design a set of distributions/models under both proportional-hazard and non-proportional-hazard assumptions, and carry out a simulation study to compare performance of those hypothesis tests in those models. Based on your numerical investigations, write a practical recommendation for general users to choose a suitable testing tool.  
 
 
 **Reference**
 Harrington, D. P. and Fleming, T. R. (1982). A class of rank test procedures for censored survival data. Biometrika 69, 553-566.
 
+## Non-proportional test assumption
 
 ```{r, non-proportional}
-p <- 500
+# sampling survival times from exponential distribution & Weibull distribution
+set.seed(8160)
+p = 500
 
-time = c(rexp(p),rweibull(p, 0.3, 0.1))  # a generated exponential distribution & weibull distribution
+test_data = data.frame(
+  time = c(rexp(p), rweibull(p, 0.3, 0.1)),
+  treatment = rep(1, 500),
+  control = rep(0, 500),
+  event = time >= 5,
+  group = c(treatment, control)
+)
 
-trt = rep(1, 500)
-ctl = rep(0, 500)
+logrank.test(test_data$time, test_data$event, test_data$group, rho = 0, gamma = 0)
 
-plot(density(time))
+#plot(density(time))
 
 ```
 
+## Proportional test
 
-```{r, coxed simulation}
-sim_data = sim.survdata(N = 500, T = 80, xvars = 2, censor = .2,  num.data.frames = 1)
-attributes(sim_data)
+```{r, proportional}
+set.seed(8160)
+sim_data = sim.survdata(N = 1000, T = 100, xvars = 1, censor = .2, num.data.frames = 1) # simulating data
 
-head(sim_data$xdata)
-head(sim_data$data$y)
+head(sim_data$data$X)
+head(sim_data$data$y) 
 head(sim_data$data$failed)
 
-logrank.test(sim_data$data$X1, sim_data$data$failed, sim_data$data$y, rho = 0, gamma = 0)
+plot(sim_data$data$X, sim_data$data$y)
 
-logrank.test(sim_data$data$X1, sim_data$data$failed, sim_data$data$y, rho = 1, gamma = 0)
-
-logrank.test(sim_data$data$X1, sim_data$data$failed, sim_data$data$y, rho = 0, gamma = 1)
 ```
+
+
+```{r, prop log-rank tests}
+# log-rank
+logrank.test(sim_data$data$X, sim_data$data$failed, sim_data$data$y, rho = 0, gamma = 0)
+
+# weighted late effect
+logrank.test(sim_data$data$X, sim_data$data$failed, sim_data$data$y, rho = 0, gamma = 1)
+
+# weighted early effect 
+logrank.test(sim_data$data$X, sim_data$data$failed, sim_data$data$y, rho = 1, gamma = 0)
+
+logrank.maxtest(sim_data$data$X, sim_data$data$failed, sim_data$data$y)
+```
+
 
 type I: false positive 
 type II: false negative*
 
-proportional-test: observed and expected 一致
-nonproportional-test: observed and expected 不一致
-
 repeat tests under the same setting 
-
-scenario 1: prop - same distribution(log normal), treatment and control group
-scenerio 2: nonprop - one from exp, the other one from weibull distribution
 
