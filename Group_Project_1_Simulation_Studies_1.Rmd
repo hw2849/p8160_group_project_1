@@ -34,33 +34,14 @@ set.seed(8160)
 
 ## Project 2: Design a simulation study to assess the three hypothsis testings 
 
-
-**Background:** Continue from the background introduction in Project 1. 
-In many randomized clinical trials, the primary outcome is a time-to-event. The treatment effect is summarized by the hazard ratio (HR) between the control and treatment arms, under the proportional hazards assumption.  The logrank test is widely used to determine the treatment effect since it is the optimal (most powerful) rank test under the proportional hazards assumption. 
-
-Let $t_1<t_2<\cdots<t_J$ are $J$ distinct failure times; The log-rank test statistics calculate the difference between "observed" and "expected" number of faitures (under $H_0$) at each observed failure time, and aggregate them overtime.
-
-$$S_{Logrank} =\frac{\sum_{j=1}^J (O_{j}-E_{j})}{\sqrt{\sum_{j=1}^J V_{j}}}\sim N(0, 1) \, \mbox{ under } H_0,$$
-where $O_j$ and $E_j$ are "observed" and "expected" numbers of failures at the $j$th failure time, and $V_{j}$ is the variance of the observed number of failures.
+Design a set of distributions/models under both proportional-hazard and non-proportional-hazard assumptions, and carry out a simulation study to compare performance of those hypothesis tests in those models. Based on your numerical investigations, write a practical recommendation for general users to choose a suitable testing tool.  
 
 
-During the last decade, more and more researchers reported that non-proportional hazards (non-PH) occur fairly often in clinical trials. For example, a therapy could shown effective at an early stage, but then ‘wearing off’ over time; or a therapy could show a "delayed" effect which only manifest after a period of time. 
+### Non-proportional
 
-To adjust for potential non-proportional hazard functions, Fleming and Harrington considered "weighted log rank tests" 
+Under non-proportional test assumption, we generate data set of a sample size n = 1000, from two different distributions, exponential distribution (p = 500) and Weibull distribution (p = 500). We have a time variable, treatment and control group, and an event variable indicating censoring. 
 
-$$S_{Logrank}^w =\frac{\sum_{j=1}^J W_j(O_{j}-E_{j})}{\sqrt{\sum_{j=1}^J W_jV_{j}}},$$
-where the weight function  $w(t)=\widehat{S}(t)^\rho (1-\widehat{S}(t))^\gamma$ include two parameters $\rho$ and $\gamma$; Choosing $(\rho=0, \gamma=1)$ puts more weight on late events, $(\rho=1, \gamma=0)$ puts more weight on early events. Researchers also considered combining different weighting schemes with appropriate multiple comparison controls. The following R functions 
-
-
-**Your tasks:**  Design a set of distributions/models under both proportional-hazard and non-proportional-hazard assumptions, and carry out a simulation study to compare performance of those hypothesis tests in those models. Based on your numerical investigations, write a practical recommendation for general users to choose a suitable testing tool.  
-
-
-**Reference**
-Harrington, D. P. and Fleming, T. R. (1982). A class of rank test procedures for censored survival data. Biometrika 69, 553-566.
-
-## Non-proportional test assumption
-
-```{r, non-proportional}
+```{r, non-proportional data simulation}
 # sampling survival times from exponential distribution & Weibull distribution
 set.seed(8160)
 p = 500
@@ -68,66 +49,117 @@ treatment = rep(1, 500)
 control = rep(0, 500)
 
 test_data = data.frame(
-  time = c(rexp(p), rweibull(p, 0.3, 0.1)),
+  time = c(rexp(p), rweibull(p, 0.3, 0.1)), 
   group = c(treatment, control)
 ) %>% 
-#  filter(time >= 4) %>% 
   mutate(
     event = case_when(time >= 4 ~ 0, 
                       time < 4 ~ 1)
   )
 
-logrank.test(test_data$time, test_data$event, test_data$group, rho = 0, gamma = 0)
-logrank.test(test_data$time, test_data$event, test_data$group, rho = 1, gamma = 0)
-logrank.test(test_data$time, test_data$event, test_data$group, rho = 0, gamma = 1)
+plot(survfit(Surv(time, event) ~ group, data = test_data), 
+     xlab = "Time", 
+     ylab = "Overall survival probability")
 
-# plot(density(test_data$time))
+# Exponential
+model_exp = survreg(Surv(time, event) ~ group, test_data, dist = "exponential")
+summary(model_exp)
+
+
+## Weibull
+model_weibull = survreg(Surv(time, event) ~ group, test_data, dist = "weibull", scale = 1)
+summary(model_weibull)
 
 ```
 
-## Proportional test
 
-```{r, proportional}
+#### Non-proportional: log-rank and weighted log-rank tests 
+```{r, non-proportional, log-rank test}
+## log-rank test
+logrank.test(test_data$time, test_data$event, test_data$group, rho = 0, gamma = 0)
+
+## weighted log-rank test for an early effect 
+logrank.test(test_data$time, test_data$event, test_data$group, rho = 1, gamma = 0)
+
+## weighted log-rank test for a late effect 
+logrank.test(test_data$time, test_data$event, test_data$group, rho = 0, gamma = 1)
+
+
+# take maximum over the previous three log-rank with multiple comparison control
+logrank.maxtest(test_data$time, test_data$event, test_data$group)
+```
+
+**Decisions**
+
+*Log-rank test:* The Chi-Squared test statistic is 115 with 1 degree of freedom and the corresponding p-value is 0. Since this p-value is less than .05, we reject the null hypothesis.
+
+*Weighted log-rank test for an early effect:*
+The Chi-Squared test statistic is 305 with 1 degree of freedom and the corresponding p-value is 0. Since this p-value is less than 0.05, we reject the null hypothesis.
+
+*Weighted log-rank test for a late effect:*
+The Chi-Squared test statistic is 0.2 with 1 degree of freedom and the corresponding p-value is 0.7. Since this p-value is greater than 0.05, we fail to reject the null hypothesis.
+
+### Proportional
+
+Under proportional assumption, we generate survival data with `sim.survdata` with variables `group`, `time`, and `fail`. 
+
+* group: 1 = treatment, 0 = control
+
+```{r, proportional simulation}
 set.seed(8160)
-sim_data = sim.survdata(N = 500, T = 100, xvars = 1, censor = .4, num.data.frames = 2) # simulating data
 
+## simulating data
+sim_data = sim.survdata(N = 500, T = 100, xvars = 1, censor = .4, num.data.frames = 2) 
+
+## data frame
 test_df = data.frame( #trt = 1, ctl = 0
   time_1 = sim_data[[1]]$data$y,
   time_0 = sim_data[[2]]$data$y,
   fail_1 = sim_data[[1]]$data$failed,
   fail_0 = sim_data[[2]]$data$failed
 ) %>% 
-  pivot_longer(
+  pivot_longer( # make df readable
     time_1:fail_0,
     names_to = c(".value", "group"),
     names_sep = "_"
   ) %>% 
   mutate(group = as.numeric(group))
 
+## plot survival curves for each group
+plot(survfit(Surv(time, fail) ~ group, data = test_df), 
+     xlab = "Time", 
+     ylab = "Overall survival probability")
+```
 
+#### Proportional: log-rank tests
+```{r, proportional}
+## log-rank test
 logrank.test(test_df$time, test_df$fail, test_df$group, rho = 0, gamma = 0)
+
+## weighted log-rank test for an early effect 
 logrank.test(test_df$time, test_df$fail, test_df$group, rho = 1, gamma = 0)
+
+## weighted log-rank test for a late effect 
 logrank.test(test_df$time, test_df$fail, test_df$group, rho = 0, gamma = 1)
 
+# take maximum over the previous three log-rank with multiple comparison control
+logrank.maxtest(test_df$time, test_df$fail, test_df$group)
 ```
 
+**Decisions** 
 
-```{r, prop log-rank tests}
-# log-rank
-logrank.test(sim_data$data$y, sim_data$data$failed, sim_data$data$y, rho = 0, gamma = 0)
+*Log-rank test:* The Chi-Squared test statistic is 61.7 with 1 degree of freedom and the corresponding p-value is 0. Since this p-value is less than .05, we reject the null hypothesis.
 
-# weighted late effect
-logrank.test(sim_data$data$X, sim_data$data$failed, sim_data$data$y, rho = 0, gamma = 1)
+*Weighted log-rank test for an early effect:*
+The Chi-Squared test statistic is 62.1 with 1 degree of freedom and the corresponding p-value is 0. Since this p-value is less than 0.05, we reject the null hypothesis.
 
-# weighted early effect 
-logrank.test(sim_data$data$X, sim_data$data$failed, sim_data$data$y, rho = 1, gamma = 0)
-
-logrank.maxtest(sim_data$data$X, sim_data$data$failed, sim_data$data$y)
-```
+*Weighted log-rank test for a late effect:*
+The Chi-Squared test statistic is 28.8 with 1 degree of freedom and the corresponding p-value is 0. Since this p-value is greater than 0.05, we reject the null hypothesis.
 
 
 type I: false positive 
 type II: false negative*
 
 repeat tests under the same setting 
+
 
