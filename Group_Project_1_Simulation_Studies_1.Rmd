@@ -64,11 +64,11 @@ Harrington, D. P. and Fleming, T. R. (1982). A class of rank test procedures for
 # sampling survival times from exponential distribution & Weibull distribution
 set.seed(8160)
 p = 500
+treatment = rep(1, 500)
+control = rep(0, 500)
 
 test_data = data.frame(
   time = c(rexp(p), rweibull(p, 0.3, 0.1)),
-  treatment = rep(1, 500),
-  control = rep(0, 500),
   group = c(treatment, control)
 ) %>% 
 #  filter(time >= 4) %>% 
@@ -81,14 +81,7 @@ logrank.test(test_data$time, test_data$event, test_data$group, rho = 0, gamma = 
 logrank.test(test_data$time, test_data$event, test_data$group, rho = 1, gamma = 0)
 logrank.test(test_data$time, test_data$event, test_data$group, rho = 0, gamma = 1)
 
-#plot(density(time))
-
-library(survival)
-library(survminer)
-library(lubridate)
-
-
-lung_data = lung  
+# plot(density(test_data$time))
 
 ```
 
@@ -113,7 +106,6 @@ test_df = data.frame( #trt = 1, ctl = 0
 
 
 logrank.test(test_df$time, test_df$fail, test_df$group, rho = 0, gamma = 0)
-
 logrank.test(test_df$time, test_df$fail, test_df$group, rho = 1, gamma = 0)
 logrank.test(test_df$time, test_df$fail, test_df$group, rho = 0, gamma = 1)
 
