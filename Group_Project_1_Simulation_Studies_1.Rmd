@@ -2,7 +2,7 @@
 title: "Group Project1_Monte Carlo Simulation Design."
 author: "hw2849"
 date: "P8160 Advanced Statistical Computing "
-output: html_document
+output: github_document
 editor_options: 
   chunk_output_type: console
 ---
