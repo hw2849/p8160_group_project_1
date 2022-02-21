@@ -1,7 +1,7 @@
 ---
 title: "Group Project1_Monte Carlo Simulation Design."
 author: "hw2849"
-date: "P8160 Advanced Statistical Computing "
+date: "02/15/2022 "
 output: github_document
 editor_options: 
   chunk_output_type: console
@@ -10,33 +10,22 @@ editor_options:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
-require(survival)
-require(quantreg)
-require(glmnet)
-require(MASS)
-require(pROC)
-
 library(survival)
 library(coxed)
 library(nph)
 library(tidyverse)
-
-set.seed(8160)
+library(pwr)
+library(simsurv)
+library(flexsurv)
 ```
 
 
-\begin{description}
-
-\item[Project 2] Design a simulation study to assess the three hypothesis testings]
-
-\end{description}
-
-
-## Project 2: Design a simulation study to assess the three hypothsis testings 
+## Topic 2: Design a simulation study to assess the three hypothsis testings 
 
 Design a set of distributions/models under both proportional-hazard and non-proportional-hazard assumptions, and carry out a simulation study to compare performance of those hypothesis tests in those models. Based on your numerical investigations, write a practical recommendation for general users to choose a suitable testing tool.  
 
 
+## Scenario1: 
 ### Non-proportional
 
 Under non-proportional test assumption, we generate data set of a sample size n = 1000, from two different distributions, exponential distribution (p = 500) and Weibull distribution (p = 500). We have a time variable, treatment and control group, and an event variable indicating censoring. 
@@ -44,75 +33,73 @@ Under non-proportional test assumption, we generate data set of a sample size n 
 ```{r, non-proportional data simulation}
 # sampling survival times from exponential distribution & Weibull distribution
 set.seed(8160)
-p = 500
-treatment = rep(1, 500)
-control = rep(0, 500)
+N = 500
+treatment = rbinom(N, 1, 0.5) #trt or ctl
 
-test_data = data.frame(
-  time = c(rexp(p), rweibull(p, 0.3, 0.1)), 
-  group = c(treatment, control)
+prop_data = data.frame(
+  eventime = c(rexp(N, 0.1), rweibull(N, 0.6, 1)), 
+  treatment
 ) %>% 
   mutate(
-    event = case_when(time >= 4 ~ 0, 
-                      time < 4 ~ 1)
+    status = case_when(eventime >= 4 ~ 0, 
+                      eventime < 4 ~ 1)
   )
 
-plot(survfit(Surv(time, event) ~ group, data = test_data), 
+plot(survfit(Surv(eventime, status) ~ treatment, data = prop_data), 
+    main = "Non-Proportional model",
      xlab = "Time", 
      ylab = "Overall survival probability")
 
-# Exponential
-model_exp = survreg(Surv(time, event) ~ group, test_data, dist = "exponential")
-summary(model_exp)
 
+## Non-proportional: log-rank and weighted log-rank tests 
 
-## Weibull
-model_weibull = survreg(Surv(time, event) ~ group, test_data, dist = "weibull", scale = 1)
-summary(model_weibull)
+logrank.test(prop_data$eventime, prop_data$status, prop_data$treatment, rho = 0, gamma = 0)
+logrank.test(prop_data$eventime, prop_data$status, prop_data$treatment, rho = 1, gamma = 0)
+logrank.test(prop_data$eventime, prop_data$status, prop_data$treatment, rho = 0, gamma = 1)
+logrank.maxtest(prop_data$eventime, prop_data$status, prop_data$treatment)
 
+## power test
+ctl = prop_data %>% 
+  filter(treatment == 0)
+trt = prop_data %>% 
+  filter(treatment == 1)
+mu1 = mean(prop_data$eventime)
+mu2 = mean(prop_data$eventime)
+Var = var(prop_data$eventime)
+H = (mu1- mu2)/Var
+pwr = pwr.t2n.test(n1 = nrow(ctl), n2 = nrow(trt), d = H, sig.level = 0.05)
+type2e = 1 - pwr$power
 ```
 
-
-#### Non-proportional: log-rank and weighted log-rank tests 
-```{r, non-proportional, log-rank test}
-## log-rank test
-logrank.test(test_data$time, test_data$event, test_data$group, rho = 0, gamma = 0)
-
-## weighted log-rank test for an early effect 
-logrank.test(test_data$time, test_data$event, test_data$group, rho = 1, gamma = 0)
-
-## weighted log-rank test for a late effect 
-logrank.test(test_data$time, test_data$event, test_data$group, rho = 0, gamma = 1)
-
-
-# take maximum over the previous three log-rank with multiple comparison control
-logrank.maxtest(test_data$time, test_data$event, test_data$group)
-```
 
 **Decisions**
 
-*Log-rank test:* The Chi-Squared test statistic is 115 with 1 degree of freedom and the corresponding p-value is 0. Since this p-value is less than .05, we reject the null hypothesis.
+*Log-rank test:* The Chi-Squared test statistic is 0.6 with 1 degree of freedom and the corresponding p-value is 0.5. Since this p-value is great than .05, we fail to reject the null hypothesis.
 
 *Weighted log-rank test for an early effect:*
-The Chi-Squared test statistic is 305 with 1 degree of freedom and the corresponding p-value is 0. Since this p-value is less than 0.05, we reject the null hypothesis.
+The Chi-Squared test statistic is 0.7 with 1 degree of freedom and the corresponding p-value is 0.4. Since this p-value is greater than 0.05, we fail to reject the null hypothesis.
 
 *Weighted log-rank test for a late effect:*
 The Chi-Squared test statistic is 0.2 with 1 degree of freedom and the corresponding p-value is 0.7. Since this p-value is greater than 0.05, we fail to reject the null hypothesis.
 
-### Proportional
+Therefore, when the hazard model simulated under non-proportional assumption with exponential and Weibull distribution, all tests failed to reject the null hypothesis. The type I errors are the p-values of each test. The type II error is 0.95.
 
-Under proportional assumption, we generate survival data with `sim.survdata` with variables `group`, `time`, and `fail`. 
+## Scenario 2
+
+### Proportional-censored
+
+Under proportional assumption, we generate survival data with `sim.survdata` with variables `group`, `time`, and `fail`. Similarly, we simulated with a sample size of 1000, and tested `censored` and `uncensored`. 
 
 * group: 1 = treatment, 0 = control
 
 ```{r, proportional simulation}
 set.seed(8160)
 
-## simulating data
-sim_data = sim.survdata(N = 500, T = 100, xvars = 1, censor = .4, num.data.frames = 2) 
+## simulating data, censor.cond = TRUE
+sim_data = sim.survdata(N = 500, T = 100, xvars = 1, censor = 0.2, censor.cond = TRUE, num.data.frames = 2) 
 
 ## data frame
-test_df = data.frame( #trt = 1, ctl = 0
+prop_df = data.frame( #trt = 1, ctl = 0
   time_1 = sim_data[[1]]$data$y,
   time_0 = sim_data[[2]]$data$y,
   fail_1 = sim_data[[1]]$data$failed,
@@ -126,40 +113,238 @@ test_df = data.frame( #trt = 1, ctl = 0
   mutate(group = as.numeric(group))
 
 ## plot survival curves for each group
-plot(survfit(Surv(time, fail) ~ group, data = test_df), 
+plot(survfit(Surv(time, fail) ~ group, data = prop_df), 
+     main = "Proportional model",
      xlab = "Time", 
      ylab = "Overall survival probability")
+
+## Proportional: log-rank tests
+logrank.test(prop_df$time, prop_df$fail, prop_df$group, rho = 0, gamma = 0)
+logrank.test(prop_df$time, prop_df$fail, prop_df$group, rho = 1, gamma = 0)
+logrank.test(prop_df$time, prop_df$fail, prop_df$group, rho = 0, gamma = 1)
+logrank.maxtest(prop_df$time, prop_df$fail, prop_df$group)
+
+
+## power test
+ctl = prop_df %>% 
+  filter(group == 0)
+trt = prop_df %>% 
+  filter(group == 1)
+mu1 = mean(ctl$time)
+mu2 = mean(trt$time)
+Var = var(prop_df$time)
+H = (mu1 - mu2)/Var
+pwr = pwr.t2n.test(n1 = nrow(ctl), n2 = nrow(trt), d = H, sig.level = 0.05)
+type2e = 1 - pwr$power
 ```
 
-#### Proportional: log-rank tests
-```{r, proportional}
-## log-rank test
-logrank.test(test_df$time, test_df$fail, test_df$group, rho = 0, gamma = 0)
-
-## weighted log-rank test for an early effect 
-logrank.test(test_df$time, test_df$fail, test_df$group, rho = 1, gamma = 0)
-
-## weighted log-rank test for a late effect 
-logrank.test(test_df$time, test_df$fail, test_df$group, rho = 0, gamma = 1)
-
-# take maximum over the previous three log-rank with multiple comparison control
-logrank.maxtest(test_df$time, test_df$fail, test_df$group)
-```
+When n = 1000, T = 100, censor = 0.2, censor.cond = TRUE: 
 
 **Decisions** 
 
-*Log-rank test:* The Chi-Squared test statistic is 61.7 with 1 degree of freedom and the corresponding p-value is 0. Since this p-value is less than .05, we reject the null hypothesis.
+*Log-rank test:* The Chi-Squared test statistic is 3.2 with 1 degree of freedom and the corresponding p-value is 0.07. Since this p-value is greater than .05, we fail to reject the null hypothesis.
 
 *Weighted log-rank test for an early effect:*
-The Chi-Squared test statistic is 62.1 with 1 degree of freedom and the corresponding p-value is 0. Since this p-value is less than 0.05, we reject the null hypothesis.
+The Chi-Squared test statistic is 2.4 with 1 degree of freedom and the corresponding p-value is 0.1. Since this p-value is greater than 0.05, we fail to reject the null hypothesis.
 
 *Weighted log-rank test for a late effect:*
-The Chi-Squared test statistic is 28.8 with 1 degree of freedom and the corresponding p-value is 0. Since this p-value is greater than 0.05, we reject the null hypothesis.
+The Chi-Squared test statistic is 2.6 with 1 degree of freedom and the corresponding p-value is 0.1. Since this p-value is less than 0.05, we fail to reject the null hypothesis.
+
+The power of the test is 0.949. 
+
+#### Proportional: right-censored 
+
+```{r, proportional simulation}
+set.seed(8160)
+
+## simulating data, censor.cond = false
+sim_data = sim.survdata(N = 500, T = 100, xvars = 1, censor = 0.2, censor.cond = FALSE, num.data.frames = 2) 
+
+## data frame
+prop_df = data.frame( #trt = 1, ctl = 0
+  time_1 = sim_data[[1]]$data$y,
+  time_0 = sim_data[[2]]$data$y,
+  fail_1 = sim_data[[1]]$data$failed,
+  fail_0 = sim_data[[2]]$data$failed
+) %>% 
+  pivot_longer( # make df readable
+    time_1:fail_0,
+    names_to = c(".value", "group"),
+    names_sep = "_"
+  ) %>% 
+  mutate(group = as.numeric(group))
+
+## plot survival curves for each group
+plot(survfit(Surv(time, fail) ~ group, data = prop_df), 
+     main = "Proportional model",
+     xlab = "Time", 
+     ylab = "Overall survival probability")
 
 
-type I: false positive 
-type II: false negative*
+logrank.test(prop_df$time, prop_df$fail, prop_df$group, rho = 0, gamma = 0)
+logrank.test(prop_df$time, prop_df$fail, prop_df$group, rho = 1, gamma = 0)
+logrank.test(prop_df$time, prop_df$fail, prop_df$group, rho = 0, gamma = 1)
+logrank.maxtest(prop_df$time, prop_df$fail, prop_df$group)
 
-repeat tests under the same setting 
+
+## power test
+ctl = prop_df %>% 
+  filter(group == 0)
+trt = prop_df %>% 
+  filter(group == 1)
+mu1 = mean(ctl$time)
+mu2 = mean(trt$time)
+Var = var(prop_df$time)
+H = (mu1 - mu2)/Var
+pwr = pwr.t2n.test(n1 = nrow(ctl), n2 = nrow(trt), d = H, sig.level = 0.05)
+type2e = 1 - pwr$power
+```
+
+When n = 1000, T = 100, censor = 0.2, censor.cond = FALSE (right-censored): 
+
+**Decisions** 
+
+*Log-rank test:* The Chi-Squared test statistic is 104 with 1 degree of freedom and the corresponding p-value is 0. Since this p-value is less than .05, we reject the null hypothesis.
+
+*Weighted log-rank test for an early effect:*
+The Chi-Squared test statistic is 90.7 with 1 degree of freedom and the corresponding p-value is 0. Since this p-value is less than 0.05, we reject the null hypothesis.
+
+*Weighted log-rank test for a late effect:*
+The Chi-Squared test statistic is 65.3 with 1 degree of freedom and the corresponding p-value is 0. Since this p-value is less than 0.05, we reject the null hypothesis.
+
+The power of the test is 0.938.
 
 
+## repeat test for different conditions
+Now we want to repeat our tests with different conditions. 
+* censor = 0.9 
+
+```{r, proportional simulation}
+set.seed(8160)
+## simulating data, censor.cond = TRUE
+sim_data = sim.survdata(N = 500, T = 100, xvars = 1, censor = 0.9, censor.cond = TRUE, num.data.frames = 2) 
+
+## data frame
+prop_df = data.frame( #trt = 1, ctl = 0
+  time_1 = sim_data[[1]]$data$y,
+  time_0 = sim_data[[2]]$data$y,
+  fail_1 = sim_data[[1]]$data$failed,
+  fail_0 = sim_data[[2]]$data$failed
+) %>% 
+  pivot_longer( # make df readable
+    time_1:fail_0,
+    names_to = c(".value", "group"),
+    names_sep = "_"
+  ) %>% 
+  mutate(group = as.numeric(group))
+
+## plot survival curves for each group
+plot(survfit(Surv(time, fail) ~ group, data = prop_df), 
+     main = "Proportional model",
+     xlab = "Time", 
+     ylab = "Overall survival probability")
+
+## Proportional: log-rank tests
+logrank.test(prop_df$time, prop_df$fail, prop_df$group, rho = 0, gamma = 0)
+logrank.test(prop_df$time, prop_df$fail, prop_df$group, rho = 1, gamma = 0)
+logrank.test(prop_df$time, prop_df$fail, prop_df$group, rho = 0, gamma = 1)
+logrank.maxtest(prop_df$time, prop_df$fail, prop_df$group)
+
+
+## power test
+ctl = prop_df %>% 
+  filter(group == 0)
+trt = prop_df %>% 
+  filter(group == 1)
+mu1 = mean(ctl$time)
+mu2 = mean(trt$time)
+Var = var(prop_df$time)
+H = (mu1 - mu2)/Var
+pwr = pwr.t2n.test(n1 = nrow(ctl), n2 = nrow(trt), d = H, sig.level = 0.05)
+type2e = 1 - pwr$power
+```
+
+When n = 1000, T = 100, censor = 0.9, censor.cond = TRUE: 
+
+**Decisions** 
+
+*Log-rank test:* The Chi-Squared test statistic is 0.2 with 1 degree of freedom and the corresponding p-value is 0.7 Since this p-value is greater than .05, we fail to reject the null hypothesis.
+
+*Weighted log-rank test for an early effect:*
+The Chi-Squared test statistic is 0.1 with 1 degree of freedom and the corresponding p-value is 0.8 Since this p-value is greater than 0.05, we fail to reject the null hypothesis.
+
+*Weighted log-rank test for a late effect:*
+The Chi-Squared test statistic is 2.3 with 1 degree of freedom and the corresponding p-value is 0.1. Since this p-value is less than 0.05, we fail to reject the null hypothesis.
+
+
+
+```{r, proportional simulation}
+set.seed(8160)
+
+## simulating data, censor.cond = false
+sim_data = sim.survdata(N = 500, T = 100, xvars = 1, censor = 0.9, censor.cond = FALSE, num.data.frames = 2) 
+
+## data frame
+prop_df = data.frame( #trt = 1, ctl = 0
+  time_1 = sim_data[[1]]$data$y,
+  time_0 = sim_data[[2]]$data$y,
+  fail_1 = sim_data[[1]]$data$failed,
+  fail_0 = sim_data[[2]]$data$failed
+) %>% 
+  pivot_longer( # make df readable
+    time_1:fail_0,
+    names_to = c(".value", "group"),
+    names_sep = "_"
+  ) %>% 
+  mutate(group = as.numeric(group))
+
+## plot survival curves for each group
+plot(survfit(Surv(time, fail) ~ group, data = prop_df), 
+     main = "Proportional model",
+     xlab = "Time", 
+     ylab = "Overall survival probability")
+
+
+logrank.test(prop_df$time, prop_df$fail, prop_df$group, rho = 0, gamma = 0)
+logrank.test(prop_df$time, prop_df$fail, prop_df$group, rho = 1, gamma = 0)
+logrank.test(prop_df$time, prop_df$fail, prop_df$group, rho = 0, gamma = 1)
+logrank.maxtest(prop_df$time, prop_df$fail, prop_df$group)
+
+
+## power test
+ctl = prop_df %>% 
+  filter(group == 0)
+trt = prop_df %>% 
+  filter(group == 1)
+mu1 = mean(ctl$time)
+mu2 = mean(trt$time)
+Var = var(prop_df$time)
+H = (mu1 - mu2)/Var
+pwr = pwr.t2n.test(n1 = nrow(ctl), n2 = nrow(trt), d = H, sig.level = 0.05)
+type2e = 1 - pwr$power
+```
+
+When n = 1000, T = 100, censor = 0.9, censor.cond = FALSE (right-censored): 
+
+**Decisions** 
+
+*Log-rank test:* The Chi-Squared test statistic is 10.4 with 1 degree of freedom and the corresponding p-value is 0001. Since this p-value is less than .05, we reject the null hypothesis.
+
+*Weighted log-rank test for an early effect:*
+The Chi-Squared test statistic is 11.9 with 1 degree of freedom and the corresponding p-value is 0. Since this p-value is less than 0.05, we reject the null hypothesis.
+
+*Weighted log-rank test for a late effect:*
+The Chi-Squared test statistic is 0.2 with 1 degree of freedom and the corresponding p-value is 0.6. Since this p-value is greater than 0.05, we fail to reject the null hypothesis.
+
+## Conclusion
+
+Under proportional assumption: 
+
+* when the sample size increase, the overall survival probability increases. 
+* when censor rate = 0.2, and censoring is true, all three tests fail to reject the null hypothesis; censoring is false (right-censored), all three tests reject the null hypothesis.
+* similarly, when censor rate = 0.9, and censoring is true, all three tests fail to reject the null hypothesis; censoring is false (right-censored), weighted log-rank test for a late effect fail to reject the null hypothesis, and two other tests reject. 
+0.9 true fail, false reject
+
+Under non-proportional assumption: 
+* Variation of sample size does not have a significant change on results; 
+* All tests failed to reject the null hypothesis.

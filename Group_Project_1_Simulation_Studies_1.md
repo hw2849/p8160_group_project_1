@@ -36,6 +36,7 @@ test_data = data.frame(
   )
 
 plot(survfit(Surv(time, event) ~ group, data = test_data), 
+    main = "Non-Proportional model",
      xlab = "Time", 
      ylab = "Overall survival probability")
 ```
@@ -198,6 +199,7 @@ test_df = data.frame( #trt = 1, ctl = 0
 
 ## plot survival curves for each group
 plot(survfit(Surv(time, fail) ~ group, data = test_df), 
+     main = "Proportional model",
      xlab = "Time", 
      ylab = "Overall survival probability")
 ```
