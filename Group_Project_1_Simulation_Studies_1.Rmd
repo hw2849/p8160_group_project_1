@@ -92,7 +92,7 @@ Under proportional assumption, we generate survival data with `sim.survdata` wit
 
 * group: 1 = treatment, 0 = control
 
-```{r, proportional simulation}
+```{r, proportional true}
 set.seed(8160)
 
 ## simulating data, censor.cond = TRUE
@@ -154,7 +154,7 @@ The power of the test is 0.949.
 
 #### Proportional: right-censored 
 
-```{r, proportional simulation}
+```{r, proportional false}
 set.seed(8160)
 
 ## simulating data, censor.cond = false
@@ -219,7 +219,7 @@ The power of the test is 0.938.
 Now we want to repeat our tests with different conditions. 
 * censor = 0.9 
 
-```{r, proportional simulation}
+```{r}
 set.seed(8160)
 ## simulating data, censor.cond = TRUE
 sim_data = sim.survdata(N = 500, T = 100, xvars = 1, censor = 0.9, censor.cond = TRUE, num.data.frames = 2) 
@@ -278,7 +278,7 @@ The Chi-Squared test statistic is 2.3 with 1 degree of freedom and the correspon
 
 
 
-```{r, proportional simulation}
+```{r}
 set.seed(8160)
 
 ## simulating data, censor.cond = false
