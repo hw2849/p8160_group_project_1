@@ -666,6 +666,8 @@ Under proportional assumption:
     reject the null hypothesis, and two other tests reject. 0.9 true
     fail, false reject
 
-Under non-proportional assumption: \* Variation of sample size does not
-have a significant change on results; \* All tests failed to reject the
-null hypothesis.
+Under non-proportional assumption:
+
+-   Variation of sample size does not have a significant change on
+    results;
+-   All tests failed to reject the null hypothesis.
